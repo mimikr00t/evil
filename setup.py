@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 import os
 
 # Fileless trigger for the first payload
@@ -12,4 +12,5 @@ name='evil',
 version='0.1',
 description='Utility wrapper',
 packages=['evil'],
+
 )
