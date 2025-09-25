@@ -10,8 +10,8 @@ import getpass
 # === ENHANCED CONFIGURATION ===
 class Config:
     # Telegram settings (optional - for notifications only)
-BOT_TOKEN = "8346087012:AAGUFItHu3hRLJ4loxduUcteyJOoOzRrMkE"  # Example: "123456789:ABCdefGhIJKlmNoPQrstUvWXyz"
-CHAT_ID = "7192294390"      # Example: "131933xxxx"
+    BOT_TOKEN = "8346087012:AAGUFItHu3hRLJ4loxduUcteyJOoOzRrMkE"
+    CHAT_ID = "7192294390"
     
     # Security settings
     AUTHORIZED_USER = getpass.getuser()  # Only log for this user
@@ -226,4 +226,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
